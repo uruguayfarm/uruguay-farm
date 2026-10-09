@@ -38,7 +38,36 @@ app.get("/api/payment/:tx",async(req,res)=>{try{const STATUS_BASE=process.env.PL
 app.post("/api/webhook/pluspix",(req,res)=>{console.log("WEBHOOK",JSON.stringify(req.body));res.sendStatus(200)});
 app.get("/api/admin/orders",admin,(req,res)=>res.json(db.prepare("SELECT * FROM orders ORDER BY id DESC").all()));
 app.get("/api/admin/products",admin,(req,res)=>res.json(db.prepare("SELECT id,name,description,image,price,stock,active FROM products ORDER BY id DESC").all()));
-app.post("/api/admin/products",admin,(req,res)=>{const {name,description="",image="",price,stock}=req.body;if(!name||price===""||stock==="")return res.status(400).json({message:"Preencha nome, preço e estoque"});const img=saveImage(image);const r=db.prepare("INSERT INTO products(name,diameter,finish,description,image,price,stock,active) VALUES(?,?,?,?,?,?,?,1)").run(name,"","",description,img,Number(price),Number(stock));res.json({id:r.lastInsertRowid})});
+app.post("/api/admin/products",admin,async(req,res)=>{
+  try{
+    const {name,description="",image="",price,stock}=req.body;
+    if(!name||price===""||stock==="") return res.status(400).json({message:"Preencha nome, preço e estoque"});
+
+    const r=await fetch(process.env.SUPABASE_URL+"/rest/v1/products",{
+      method:"POST",
+      headers:{
+        "apikey":process.env.SUPABASE_KEY,
+        "Authorization":"Bearer "+process.env.SUPABASE_KEY,
+        "Content-Type":"application/json",
+        "Prefer":"return=representation"
+      },
+      body:JSON.stringify({
+        name,
+        description,
+        image,
+        price:Number(price),
+        stock:Number(stock),
+        active:true
+      })
+    });
+
+    const data=await r.json();
+    if(!r.ok) return res.status(r.status).json(data);
+    res.json(data[0]);
+  }catch(e){
+    res.status(500).json({message:e.message});
+  }
+});
 app.patch("/api/admin/products/:id",admin,(req,res)=>{const old=db.prepare("SELECT * FROM products WHERE id=?").get(req.params.id);if(!old)return res.status(404).json({message:"Produto não encontrado"});const image=req.body.imageData?saveImage(req.body.imageData):(req.body.image??old.image);db.prepare("UPDATE products SET name=?,description=?,image=?,price=?,stock=?,active=? WHERE id=?").run(req.body.name??old.name,req.body.description??old.description,image,Number(req.body.price??old.price),Number(req.body.stock??old.stock),(req.body.active??old.active)?1:0,req.params.id);res.json({success:true})});
 app.get("/api/admin/balance",admin,async(req,res)=>{try{const r=await fetch(BASE+"/api/v1/balance",{headers:headers()});res.status(r.ok?200:r.status).json(await r.json())}catch(e){res.status(500).json({message:"Erro no saldo"})}});
 app.post("/api/admin/withdraw",admin,async(req,res)=>{try{const {amount,pixKey,pixKeyType,description}=req.body;const r=await fetch(BASE+"/api/v1/withdraw",{method:"POST",headers:headers(),body:JSON.stringify({amount:Number(amount),pixKey,pixKeyType,description})});res.status(r.ok?200:r.status).json(await r.json())}catch(e){res.status(500).json({message:"Erro no saque"})}});
