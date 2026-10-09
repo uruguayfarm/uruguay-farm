@@ -16,12 +16,16 @@ function admin(req,res,next){const h=req.headers.authorization||"";if(h!=="Basic
 function saveImage(data){if(!data||!String(data).startsWith("data:image/"))return "";const m=String(data).match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/);if(!m)return "";const ext=m[1]==="jpeg"?"jpg":m[1],name=`produto-${Date.now()}-${crypto.randomBytes(3).toString("hex")}.${ext}`;fs.writeFileSync(path.join(uploads,name),Buffer.from(m[2],"base64"));return "/uploads/"+name}
 app.get("/api/products", async (req,res)=>{
   try{
-    const r=await fetch(process.env.SUPABASE_URL+"/rest/v1/products?select="*,
-      {headers:{
-        "apikey":process.env.SUPABASE_KEY,
-        "Authorization":"Bearer "+process.env.SUPABASE_KEY
-      }});
-    const data=await r.json();
+    const r = await fetch(
+      process.env.SUPABASE_URL + "/rest/v1/products?select=*",
+      {
+        headers:{
+          "apikey": process.env.SUPABASE_KEY,
+          "Authorization": "Bearer " + process.env.SUPABASE_KEY
+        }
+      }
+    );
+    const data = await r.json();
     if(!r.ok) return res.status(r.status).json(data);
     res.json(data);
   }catch(e){
